@@ -239,15 +239,16 @@
 
   /* ---- fractions (name per language) ---- */
   const FRACTIONS = [
-    { key:'rest',          no:'Restavfall',          en:'Residual waste',    icon:'🗑️', color:'#4A4A55' },
-    { key:'papir',         no:'Papir og papp',       en:'Paper & cardboard', icon:'📰', color:'#1E6FD9' },
-    { key:'plast',         no:'Plastemballasje',     en:'Plastic packaging', icon:'🥤', color:'#7F56FA' },
-    { key:'mat',           no:'Matavfall',           en:'Food waste',        icon:'🍎', color:'#2E9E5B' },
-    { key:'glassmetall',   no:'Glass og metall',     en:'Glass & metal',     icon:'🍾', color:'#17A2B8' },
-    { key:'pant',          no:'Pant',                en:'Deposit return',    icon:'♻️', color:'#E08A1E' },
-    { key:'farlig',        no:'Farlig avfall',       en:'Hazardous waste',   icon:'☣️', color:'#D6353B' },
-    { key:'ee',            no:'EE-avfall',           en:'Electrical (WEEE)', icon:'🔌', color:'#C99700' },
-    { key:'trevirke',      no:'Trevirke',            en:'Wood',              icon:'🪵', color:'#8B5E34' },
+    // Colours match the national standard (LOOP / sortere.no) exact HEX.
+    { key:'rest',          no:'Restavfall',          en:'Residual waste',    icon:'🗑️', color:'#141414' },
+    { key:'papir',         no:'Papir og papp',       en:'Paper & cardboard', icon:'📰', color:'#0082BE' },
+    { key:'plast',         no:'Plastemballasje',     en:'Plastic packaging', icon:'🥤', color:'#921E80' },
+    { key:'mat',           no:'Matavfall',           en:'Food waste',        icon:'🍎', color:'#01A04C' },
+    { key:'glassmetall',   no:'Glass og metall',     en:'Glass & metal',     icon:'🍾', color:'#1CA68D' },
+    { key:'pant',          no:'Pant',                en:'Deposit return',    icon:'♻️', color:'#189FAB' },
+    { key:'farlig',        no:'Farlig avfall',       en:'Hazardous waste',   icon:'☣️', color:'#E20F1E' },
+    { key:'ee',            no:'EE-avfall',           en:'Electrical (WEEE)', icon:'🔌', color:'#D68007' },
+    { key:'trevirke',      no:'Trevirke',            en:'Wood',              icon:'🪵', color:'#826428' },
     { key:'konfidensielt', no:'Konfidensielt papir', en:'Confidential paper',icon:'🔒', color:'#5A6472' },
   ];
   const FRAC = Object.fromEntries(FRACTIONS.map(f => [f.key, f]));
