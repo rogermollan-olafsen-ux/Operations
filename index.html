@@ -108,9 +108,38 @@
          opacity:0;transform:translateY(14px);transition:.3s;pointer-events:none;z-index:30;box-shadow:0 14px 30px rgba(0,0,0,.3)}
   .toast.show{opacity:1;transform:translateY(0)}
   .hide{display:none!important}
+
+  /* PIN-lås (åpner appen i 12 timer) */
+  #pinGate{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center}
+  #pinGate .pinTitle{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:14px}
+  #pinGate .pinDots{font-size:24px;letter-spacing:8px;color:var(--brand);min-height:30px}
+  #pinGate .pinErr{color:#D6353B;font-size:13px;font-weight:700;min-height:18px;margin:6px 0 10px}
+  #pinGate .pinKeys{display:grid;grid-template-columns:repeat(3,72px);gap:12px;margin-top:6px}
+  #pinGate .pinKeys button{width:72px;height:62px;border:1px solid var(--line);background:var(--card);border-radius:16px;font-family:inherit;font-size:24px;font-weight:800;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+  #pinGate .pinKeys button:active{transform:scale(.96)}
 </style>
 </head>
 <body>
+  <div id="pinGate">
+    <div class="logo" style="width:52px;height:52px;font-size:26px;margin-bottom:16px">♻️</div>
+    <div class="pinTitle">🔒 Tast tilgangskode · Access code</div>
+    <div class="pinDots" id="pinDots"></div>
+    <div class="pinErr" id="pinErr"></div>
+    <div class="pinKeys">
+      <button onclick="keyPin('1')">1</button>
+      <button onclick="keyPin('2')">2</button>
+      <button onclick="keyPin('3')">3</button>
+      <button onclick="keyPin('4')">4</button>
+      <button onclick="keyPin('5')">5</button>
+      <button onclick="keyPin('6')">6</button>
+      <button onclick="keyPin('7')">7</button>
+      <button onclick="keyPin('8')">8</button>
+      <button onclick="keyPin('9')">9</button>
+      <button style="visibility:hidden" aria-hidden="true"></button>
+      <button onclick="keyPin('0')">0</button>
+      <button onclick="delPin()">⌫</button>
+    </div>
+  </div>
   <div class="wrap">
     <header>
       <div class="logo">♻️</div>
@@ -190,7 +219,7 @@
       photo_add:'📷 Legg ved bilde av vekten', photo_done:'Bilde lagt ved · trykk for å bytte',
       empty:'Ingen registreringer ennå.<br>Trykk «Registrer» for å starte.',
       saved:'Lagret', saved_nophoto:'Lagret (uten bilde – lite plass)', cleared:'Loggen er tømt',
-      logempty:'Loggen er tom', csv_done:'CSV eksportert', photo_err:'Kunne ikke lese bildet',
+      logempty:'Loggen er tom', csv_done:'CSV eksportert', photo_err:'Kunne ikke lese bildet', pin_wrong:'Feil kode',
       confirm_clear:'Tømme hele loggen? Eksporter til CSV først hvis du vil ta vare på dataene.',
       floor_entry:n=>n+'. etasje', csv_head:['Tidspunkt','Fraksjon','Etasje','Kilo'] },
     en:{ app_title:'Waste logging', app_sub:'Visma House Oslo · operations',
@@ -200,7 +229,7 @@
       photo_add:'📷 Attach a photo of the scale', photo_done:'Photo attached · tap to change',
       empty:'No entries yet.<br>Tap “Register” to start.',
       saved:'Saved', saved_nophoto:'Saved (without photo – low space)', cleared:'Log cleared',
-      logempty:'The log is empty', csv_done:'CSV exported', photo_err:'Could not read the image',
+      logempty:'The log is empty', csv_done:'CSV exported', photo_err:'Could not read the image', pin_wrong:'Wrong code',
       confirm_clear:'Clear the whole log? Export to CSV first if you want to keep the data.',
       floor_entry:n=>'Floor '+n, csv_head:['Timestamp','Fraction','Floor','Kilos'] }
   };
@@ -235,13 +264,15 @@
      The local log always keeps a copy; unsynced rows are retried on save + on open,
      so nothing is lost without signal (basements/garages). Photos stay local. */
   const SHEET_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwRB9xKbhiZwrayqwwB2deUsu3EzVf0nPAEsq8rykKcRX9uckj_CFutPD39EJQPu-Nq/exec';
+  const ACCESS_PIN = '2470';         // shared access code (same every day) — change to your chosen code
+  const PIN_TTL = 12*60*60*1000;     // unlock lasts 12 hours, then re-enter the code
   function syncEntry(e){
     return fetch(SHEET_ENDPOINT, {
       method:'POST', mode:'no-cors',
       headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body: JSON.stringify({
         ts:new Date(e.ts).toISOString(), fraction:e.fraction, fractionName:fname(e.fraction),
-        floor:e.floor, kg:e.kg
+        floor:e.floor, kg:e.kg, pin:ACCESS_PIN
       })
     });
   }
@@ -424,10 +455,37 @@
     log = []; saveLog(); renderLog(); toast(t('cleared'));
   }
 
+  /* ---- PIN lock: enter the code to open the app for 12 hours ---- */
+  let pinEntry = '';
+  function renderPinDots(){
+    let s=''; for(let i=0;i<ACCESS_PIN.length;i++) s += (i<pinEntry.length ? '●' : '○');
+    var el=document.getElementById('pinDots'); if(el) el.textContent = s;
+  }
+  function keyPin(d){
+    document.getElementById('pinErr').textContent = '';
+    if(pinEntry.length >= ACCESS_PIN.length) return;
+    pinEntry += d; renderPinDots();
+    if(pinEntry.length === ACCESS_PIN.length) checkPin();
+  }
+  function delPin(){ pinEntry = pinEntry.slice(0,-1); renderPinDots(); }
+  function checkPin(){
+    if(pinEntry === ACCESS_PIN){
+      try{ localStorage.setItem('pinUntil', String(Date.now() + PIN_TTL)); }catch(e){}
+      unlockApp();
+    } else {
+      document.getElementById('pinErr').textContent = t('pin_wrong');
+      pinEntry = ''; renderPinDots();
+    }
+  }
+  function pinValid(){ try{ return Date.now() < (parseInt(localStorage.getItem('pinUntil'),10) || 0); }catch(e){ return false; } }
+  function unlockApp(){ pinEntry=''; document.getElementById('pinGate').style.display = 'none'; }
+
   /* ---- init ---- */
   applyI18n();
   goStep(1);
   syncPending();   // retry any rows not yet sent to the Sheet
+  renderPinDots();
+  if(pinValid()) unlockApp();   // still inside the 12-hour window → skip the lock
 </script>
 </body>
 </html>
