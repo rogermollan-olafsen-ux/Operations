@@ -234,7 +234,7 @@
      Paste your deployed Apps Script Web App URL below. Empty string = local only.
      The local log always keeps a copy; unsynced rows are retried on save + on open,
      so nothing is lost without signal (basements/garages). Photos stay local. */
-  const SHEET_ENDPOINT = 'https://script.google.com/a/macros/visma.com/s/AKfycbwRB9xKbhiZwrayqwwB2deUsu3EzVf0nPAEsq8rykKcRX9uckj_CFutPD39EJQPu-Nq/exec';
+  const SHEET_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwRB9xKbhiZwrayqwwB2deUsu3EzVf0nPAEsq8rykKcRX9uckj_CFutPD39EJQPu-Nq/exec';
   function syncEntry(e){
     return fetch(SHEET_ENDPOINT, {
       method:'POST', mode:'no-cors',
