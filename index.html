@@ -246,11 +246,10 @@
     { key:'mat',           no:'Matavfall',           en:'Food waste',        icon:'🍎', color:'#01A04C' },
     { key:'glassmetall',   no:'Glass og metall',     en:'Glass & metal',     icon:'🍾', color:'#1CA68D' },
     { key:'pant',          no:'Pant',                en:'Deposit return',    icon:'♻️', color:'#189FAB' },
-    { key:'farlig',        no:'Farlig avfall',       en:'Hazardous waste',   icon:'☣️', color:'#E20F1E' },
+    { key:'tork',          no:'Tork tørkepapir',     en:'Tork paper towels', icon:'🧻', color:'#78BE20' },
     { key:'ee',            no:'EE-avfall',           en:'Electrical (WEEE)', icon:'🔌', color:'#D68007' },
     { key:'trevirke',      no:'Trevirke',            en:'Wood',              icon:'🪵', color:'#826428' },
     { key:'konfidensielt', no:'Konfidensielt papir', en:'Confidential paper',icon:'🔒', color:'#5A6472' },
-    { key:'tork',          no:'Tork tørkepapir',     en:'Tork paper towels', icon:'🧻', color:'#78BE20' },
   ];
   const FRAC = Object.fromEntries(FRACTIONS.map(f => [f.key, f]));
   function fname(key){ const f = FRAC[key]; return f ? (f[lang] || f.no) : key; }
