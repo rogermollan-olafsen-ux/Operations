@@ -58,6 +58,8 @@
          padding:20px 0;box-shadow:var(--shadow);transition:transform .12s}
   .floor:active{transform:scale(.96)}
   .floor small{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-top:2px}
+  .floors.src{grid-template-columns:1fr}
+  .srcBtn{padding:22px 18px;font-size:17px;font-weight:800;text-align:left}
 
   .chosen{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
           padding:12px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;margin-bottom:14px;font-weight:700}
@@ -213,7 +215,7 @@
   /* ---- i18n (Norsk / English) ---- */
   const STR = {
     no:{ app_title:'Avfallsregistrering', app_sub:'Visma House Oslo · drift',
-      q_fraction:'Velg fraksjon', q_floor:'Hvilken etasje?', back:'‹ Tilbake',
+      q_fraction:'Velg fraksjon', q_floor:'Hvilken etasje?', q_source:'Hva slags svinn?', back:'‹ Tilbake',
       floor_small:'etasje', save:'Lagre registrering', nav_reg:'Registrer', nav_log:'Logg',
       log_title:'Logg', total_today:'Totalt i dag', export:'⬇ Eksporter CSV', clear:'Tøm logg',
       photo_add:'📷 Legg ved bilde av vekten', photo_done:'Bilde lagt ved · trykk for å bytte',
@@ -221,9 +223,9 @@
       saved:'Lagret', saved_nophoto:'Lagret (uten bilde – lite plass)', cleared:'Loggen er tømt',
       logempty:'Loggen er tom', csv_done:'CSV eksportert', photo_err:'Kunne ikke lese bildet', pin_wrong:'Feil kode',
       confirm_clear:'Tømme hele loggen? Eksporter til CSV først hvis du vil ta vare på dataene.',
-      floor_entry:n=>n+'. etasje', csv_head:['Tidspunkt','Fraksjon','Etasje','Kilo'] },
+      floor_entry:n=>n+'. etasje', csv_head:['Tidspunkt','Fraksjon','Etasje','Svinn-type','Kilo'] },
     en:{ app_title:'Waste logging', app_sub:'Visma House Oslo · operations',
-      q_fraction:'Select fraction', q_floor:'Which floor?', back:'‹ Back',
+      q_fraction:'Select fraction', q_floor:'Which floor?', q_source:'Type of waste?', back:'‹ Back',
       floor_small:'floor', save:'Save entry', nav_reg:'Register', nav_log:'Log',
       log_title:'Log', total_today:'Total today', export:'⬇ Export CSV', clear:'Clear log',
       photo_add:'📷 Attach a photo of the scale', photo_done:'Photo attached · tap to change',
@@ -231,7 +233,7 @@
       saved:'Saved', saved_nophoto:'Saved (without photo – low space)', cleared:'Log cleared',
       logempty:'The log is empty', csv_done:'CSV exported', photo_err:'Could not read the image', pin_wrong:'Wrong code',
       confirm_clear:'Clear the whole log? Export to CSV first if you want to keep the data.',
-      floor_entry:n=>'Floor '+n, csv_head:['Timestamp','Fraction','Floor','Kilos'] }
+      floor_entry:n=>'Floor '+n, csv_head:['Timestamp','Fraction','Floor','Waste type','Kilos'] }
   };
   let lang = (function(){ try{ const s=localStorage.getItem('avfallLang'); if(s&&STR[s]) return s; }catch(e){}
     return (navigator.language||'no').slice(0,2).toLowerCase()==='en' ? 'en' : 'no'; })();
@@ -243,7 +245,8 @@
     { key:'rest',          no:'Restavfall',          en:'Residual waste',    icon:'🗑️', color:'#141414' },
     { key:'papir',         no:'Papir og papp',       en:'Paper & cardboard', icon:'📰', color:'#0082BE' },
     { key:'plast',         no:'Plastemballasje',     en:'Plastic packaging', icon:'🥤', color:'#921E80' },
-    { key:'mat',           no:'Matavfall',           en:'Food waste',        icon:'🍎', color:'#01A04C' },
+    { key:'mat',           no:'Matavfall',           en:'Food waste',           icon:'🍎', color:'#01A04C' },
+    { key:'mat_kjokken',   no:'Matavfall (kjøkken)', en:'Food waste (kitchen)', icon:'🍽️', color:'#017A3D' },
     { key:'glassmetall',   no:'Glass og metall',     en:'Glass & metal',     icon:'🍾', color:'#1CA68D' },
     { key:'pant',          no:'Pant',                en:'Deposit return',    icon:'♻️', color:'#189FAB' },
     { key:'tork',          no:'Tork tørkepapir',     en:'Tork paper towels', icon:'🧻', color:'#78BE20' },
@@ -254,8 +257,21 @@
   const FRAC = Object.fromEntries(FRACTIONS.map(f => [f.key, f]));
   function fname(key){ const f = FRAC[key]; return f ? (f[lang] || f.no) : key; }
 
+  /* Kitchen food waste (mat_kjokken) asks for waste TYPE instead of a floor. The
+     type is stored in its OWN field `subtype` (floor stays empty), so the sheet
+     gets a dedicated column F "Svinn-type". */
+  const SVINN = {
+    tallerken:  { no:'Tallerkensvinn',   en:'Plate waste' },
+    produksjon: { no:'Produksjonssvinn', en:'Production waste' },
+  };
+  function svinnLabel(k){ return SVINN[k] ? (SVINN[k][lang] || SVINN[k].no) : ''; }        // display
+  function svinnSheet(k){ return SVINN[k] ? SVINN[k].no : ''; }                              // stable NO for sheet/CSV
+  function floorLabel(floor){ return floor ? t('floor_entry')(floor) : ''; }                 // numeric floor only
+  // What to show on the "chosen" line / log: waste type for kitchen, else the floor.
+  function chosenLabel(o){ return o.subtype ? svinnLabel(o.subtype) : floorLabel(o.floor); }
+
   /* ---- state ---- */
-  let state = { fraction:null, floor:null, kg:'', photo:null };
+  let state = { fraction:null, floor:null, subtype:'', kg:'', photo:null };
   let log = loadLog();
   function loadLog(){ try{ return JSON.parse(localStorage.getItem('wasteLog') || '[]'); }catch(e){ return []; } }
   function saveLog(){ try{ localStorage.setItem('wasteLog', JSON.stringify(log)); return true; }catch(e){ return false; } }
@@ -273,7 +289,7 @@
       headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body: JSON.stringify({
         ts:new Date(e.ts).toISOString(), fraction:e.fraction, fractionName:fname(e.fraction),
-        floor:e.floor, kg:e.kg, pin:ACCESS_PIN
+        floor:e.floor, kg:e.kg, subtype:svinnSheet(e.subtype), pin:ACCESS_PIN
       })
     });
   }
@@ -305,9 +321,9 @@
     document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n')); });
     document.querySelectorAll('.lang button').forEach(b => b.classList.toggle('on', b.getAttribute('data-lang')===lang));
     document.getElementById('kDec').textContent = lang==='en' ? '.' : ',';
-    renderFractions(); renderFloors();
+    renderFractions(); renderStep2();
     // refresh dynamic bits that may be visible
-    if(state.fraction && state.floor) refreshChosen();
+    if(state.fraction && (state.floor || state.subtype)) refreshChosen();
     updatePhotoBtn();
     if(!document.getElementById('logView').classList.contains('hide')) renderLog();
   }
@@ -337,21 +353,42 @@
       </button>`
     ).join('');
   }
-  function selectFraction(key){ state.fraction = key; renderFloors(); goStep(2); }
+  function selectFraction(key){ state.fraction = key; renderStep2(); goStep(2); }
+  // Step 2 is "which floor?" for most fractions, but "what kind of waste?" for
+  // kitchen food waste (Tallerkensvinn / Produksjonssvinn).
+  function renderStep2(){
+    const grid = document.getElementById('floorGrid');
+    const h = document.querySelector('#step2 h2.q');
+    if(state.fraction === 'mat_kjokken'){
+      if(h) h.textContent = t('q_source');
+      grid.classList.add('src');
+      grid.innerHTML = Object.keys(SVINN).map(k =>
+        `<button class="floor srcBtn" onclick="selectSource('${k}')">${SVINN[k][lang]||SVINN[k].no}</button>`
+      ).join('');
+    } else {
+      if(h) h.textContent = t('q_floor');
+      grid.classList.remove('src');
+      renderFloors();
+    }
+  }
   function renderFloors(){
     let html = '';
     for(let i=1;i<=9;i++) html += `<button class="floor" onclick="selectFloor(${i})">${i}<small>${t('floor_small')}</small></button>`;
     document.getElementById('floorGrid').innerHTML = html;
   }
   function selectFloor(n){
-    state.floor = n; state.kg = ''; state.photo = null;
+    state.floor = n; state.subtype = ''; state.kg = ''; state.photo = null;
+    refreshChosen(); updatePhotoBtn(); updateKg(); goStep(3);
+  }
+  function selectSource(k){   // kitchen waste type — no floor
+    state.subtype = k; state.floor = ''; state.kg = ''; state.photo = null;
     refreshChosen(); updatePhotoBtn(); updateKg(); goStep(3);
   }
   function refreshChosen(){
     const f = FRAC[state.fraction]; if(!f) return;
     const chip = document.getElementById('chChip');
     chip.style.background = f.color; chip.textContent = f.icon + ' ' + (f[lang]||f.no);
-    document.getElementById('chFloor').textContent = t('floor_entry')(state.floor);
+    document.getElementById('chFloor').textContent = chosenLabel(state);
   }
   function updatePhotoBtn(){
     const b = document.getElementById('photoBtn');
@@ -393,10 +430,10 @@
   function saveEntry(){
     const kg = parseFloat(state.kg);
     if(!(kg > 0)) return;
-    log.unshift({ id:Date.now(), fraction:state.fraction, floor:state.floor, kg:kg, ts:Date.now(), photo:state.photo || null, synced:false });
+    log.unshift({ id:Date.now(), fraction:state.fraction, floor:state.floor, subtype:state.subtype, kg:kg, ts:Date.now(), photo:state.photo || null, synced:false });
     if(!saveLog()){ log[0].photo = null; saveLog(); toast(t('saved_nophoto')); }
-    else { toast(t('saved') + ': ' + fname(state.fraction) + ' · ' + t('floor_entry')(state.floor) + ' · ' + fmtKg(kg) + ' kg'); }
-    state = { fraction:null, floor:null, kg:'', photo:null };
+    else { toast(t('saved') + ': ' + fname(state.fraction) + ' · ' + chosenLabel(state) + ' · ' + fmtKg(kg) + ' kg'); }
+    state = { fraction:null, floor:null, subtype:'', kg:'', photo:null };
     goStep(1);
     syncPending();   // push to the Google Sheet (if configured)
   }
@@ -424,7 +461,7 @@
       const when = new Date(r.ts).toLocaleString(lang==='en'?'en-GB':'nb-NO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       return `<div class="entry">
         <div class="dot" style="background:${f.color}">${f.icon}</div>
-        <div class="einfo"><b>${fname(r.fraction)}</b><small>${t('floor_entry')(r.floor)} · ${when}${SHEET_ENDPOINT ? (r.synced?' · ☁︎':' · ⏳') : ''}</small></div>
+        <div class="einfo"><b>${fname(r.fraction)}</b><small>${chosenLabel(r)} · ${when}${SHEET_ENDPOINT ? (r.synced?' · ☁︎':' · ⏳') : ''}</small></div>
         ${r.photo ? `<img class="eth" src="${r.photo}" alt="">` : ''}
         <div class="ekg">${fmtKg(r.kg)} kg</div>
       </div>`;
@@ -435,7 +472,7 @@
   function exportCsv(){
     if(!log.length){ toast(t('logempty')); return; }
     const rows = [ t('csv_head'), ...log.map(r=>[
-      new Date(r.ts).toLocaleString(lang==='en'?'en-GB':'nb-NO'), fname(r.fraction), r.floor, fmtKg(r.kg)
+      new Date(r.ts).toLocaleString(lang==='en'?'en-GB':'nb-NO'), fname(r.fraction), floorLabel(r.floor), svinnSheet(r.subtype), fmtKg(r.kg)
     ])];
     const csv = '﻿' + rows.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
     const filename = 'avfall-' + new Date().toISOString().slice(0,10) + '.csv';
